@@ -1,6 +1,6 @@
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod-redirect-0.herokuapp.com/)
 
-# Fichiers WAV (chapitre 8.2)
+# Fichiers WAV (chapitre 8)
 
 Avant de commencer. Consulter les instructions à suivre dans [instructions.md](instructions.md)
 
