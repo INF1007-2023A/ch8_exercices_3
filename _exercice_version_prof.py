@@ -61,12 +61,6 @@ def convert_to_samples(bytes):
 
 
 def main():
-	print([int(b) for b in struct.pack("h", 258)])
-	print(struct.unpack("hhh", bytes([2, 1, 42, 0, 0, 1])))
-
-	print(merge_channels([[11, 12], [21, 22]]))
-	print(separate_channels([11, 12, 21, 22, 31, 32], 3))
-
 	if not os.path.exists("output"):
 		os.mkdir("output")
 
@@ -76,11 +70,11 @@ def main():
 		writer.setframerate(SAMPLING_FREQ)
 
 		# On génére un la3 (220 Hz) et un mi4 (intonnation juste, donc ratio de 3/2)
-		samples1 = [s for s in sine_gen(220, 0.4, 3.0)]
-		samples2 = [s for s in sine_gen(220 * (3/2), 0.3, 3.0)]
+		sine_a3 = sine_gen(220, 0.4, 3.0)
+		sine_e4 = sine_gen(220 * (3/2), 0.3, 3.0)
 
 		# On met les samples dans des channels séparés (la à gauche, mi à droite)
-		merged = merge_channels([samples1, samples2])
+		merged = merge_channels([sine_a3, sine_e4])
 		data = convert_to_bytes(merged)
 
 		writer.writeframes(data)

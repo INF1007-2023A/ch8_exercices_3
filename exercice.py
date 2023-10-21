@@ -24,6 +24,9 @@ def separate_channels(samples, num_channels):
 def sine_gen(freq, amplitude, duration_seconds):
 	# Générer une onde sinusoïdale à partir de la fréquence et de l'amplitude donnée, sur le temps demandé et considérant le taux d'échantillonnage.
 	# Les échantillons sont des nombres réels entre -1 et 1.
+	# Formule de la valeur y d'une onde sinusoïdale à l'angle x en fonction de sa fréquence F et de son amplitude A :
+	# y = A * sin(F * x), où x est en radian.
+	# Si on veut le x qui correspond au moment t, on peut dire que 2π représente une seconde, donc x = t * 2π,
 	pass
 
 def convert_to_bytes(samples):
@@ -40,23 +43,32 @@ def main():
 	if not os.path.exists("output"):
 		os.mkdir("output")
 
-	print(separate_channels([[11, 12], [21, 22], [31, 32]], 3))
-
 	with wave.open("output/perfect_fifth.wav", "wb") as writer:
 		writer.setnchannels(2)
 		writer.setsampwidth(2)
 		writer.setframerate(SAMPLING_FREQ)
-		writer.setnframes(SAMPLING_FREQ*5)
 
-		# On générè un la3 (220 Hz) et un mi4 (intonnation juste, donc ratio de 3/2)
-		samples1 = [s for s in sine_gen(220, 0.4, 3.0)]
-		samples2 = [s for s in sine_gen(220 * (3/2), 0.3, 3.0)]
+		# On génére un la3 (220 Hz) et un mi4 (intonnation juste, donc ratio de 3/2)
+		sine_a3 = sine_gen(220, 0.4, 3.0)
+		sine_e4 = sine_gen(220 * (3/2), 0.3, 3.0)
 
 		# On met les samples dans des channels séparés (la à gauche, mi à droite)
-		merged = merge_channels([samples1, samples2])
+		merged = merge_channels([sine_a3, sine_e4])
 		data = convert_to_bytes(merged)
 
 		writer.writeframes(data)
+
+	with wave.open("data/stravinsky.wav", "rb") as reader:
+		data = reader.readframes(int(reader.getnframes() * 0.2))
+		samples = convert_to_samples(data)
+		# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade.
+		samples = [s * 0.2 for s in samples]
+		data = convert_to_bytes(samples)
+		with wave.open("output/stravinsky_mod.wav", "wb") as writer:
+			writer.setnchannels(2)
+			writer.setsampwidth(2)
+			writer.setframerate(SAMPLING_FREQ)
+			writer.writeframes(data)
 
 if __name__ == "__main__":
 	main()
