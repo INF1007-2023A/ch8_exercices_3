@@ -16,8 +16,26 @@ MAX_SAMPLE_VALUE = 2**(SAMPLE_BITS-1) - 1
 RIFF_HEADER_STRUCT = "4sI 4s"
 FORMAT_HEADER_STRUCT = "4sI HHIIHH"
 DATA_HEADER_STRUCT = "4sI"
-# Le format d'encodage pour 
+# Le format d'encodage pour les entêtes.
 WAVE_FILE_HEADERS_STRUCT = "<" + RIFF_HEADER_STRUCT + FORMAT_HEADER_STRUCT + DATA_HEADER_STRUCT
+
+
+# Contient tous les champs des entêtes d'un fichier WAVE.
+WaveFileHeaders = namedtuple("WaveFileHeaders", """
+	riff_id,
+	file_size,
+	wave,
+	fmt_id,
+	fmt_size,
+	wav_type,
+	num_channels,
+	sampling_freq,
+	bytes_per_second,
+	bytes_per_sample,
+	sample_bits,
+	data_id,
+	data_size
+""")
 
 
 def merge_channels(channels):
@@ -27,6 +45,12 @@ def merge_channels(channels):
 
 def separate_channels(samples, num_channels):
 	# Faire l'inverse de la fonction merge_channels
+	# Si on a en entrée [11, 21, 12, 22, 13, 23]
+	# Sur deux channels on obtiendrait :
+	# [
+	#   [11, 12, 13]
+	#   [21, 22, 23]
+	# ]
 	pass
 
 def sine_gen(freq, amplitude, duration_seconds):
@@ -43,19 +67,19 @@ def create_headers(num_samples):
 	data_size = num_samples * SAMPLE_WIDTH
 	riff_file_size = struct.calcsize(WAVE_FILE_HEADERS_STRUCT) - 8 + data_size
 
-	return WaveHeader(
-		riff=             b"RIFF",
+	return WaveFileHeaders(
+		riff_id=          b"RIFF",
 		file_size=        riff_file_size,
 		wave=             b"WAVE",
-		fmt=              b"fmt ",
+		fmt_id=           b"fmt ",
 		fmt_size=         struct.calcsize(FORMAT_HEADER_STRUCT) - 8,
 		wav_type=         1,
 		num_channels=     2,
 		sampling_freq=    SAMPLING_FREQ,
 		bytes_per_second= SAMPLING_FREQ * SAMPLE_WIDTH,
-		block_align=      SAMPLE_WIDTH,
+		bytes_per_sample= SAMPLE_WIDTH,
 		sample_bits=      SAMPLE_BITS,
-		data=             b"data",
+		data_id=          b"data",
 		data_size=        data_size
 	)
 
@@ -65,13 +89,19 @@ def convert_to_bytes(samples):
 	pass
 
 def encode_wave_data(samples):
+	# Créer les entêtes à encoder à l'aide de create_headers, les encoder en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
+	# Convertir les échantillons en octets avec la fonction convert_to_bytes.
+	# Retourner les octets d'entête et les octets de données (en deux valeurs).
 	pass
 
-def convert_to_samples(bytes):
-	# Faire l'opération inverse de convert_to_bytes, en convertissant des échantillons entier 16 bits en échantillons réels
+def convert_to_samples(sample_bytes):
+	# Faire l'opération inverse de convert_to_bytes, en convertissant des échantillons entiers signés de 16 bits en échantillons réels.
 	pass
 
 def decode_wave_data(file_bytes):
+	# Décoder les entês en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
+	# Décoder les octets de données en échantillons réel avec la fonction convert_to_samples en se positionnant au début des données (après les octets).
+	# Retourner les entêtes décodés (sous la forme d'un WaveFileHeaders) et la liste d'échantillons réel en deux valeurs.
 	pass
 
 
@@ -79,30 +109,41 @@ def main():
 	if not os.path.exists("output"):
 		os.mkdir("output")
 
+	# Si on veut juste tester l'encodage des échantillons, on peut appeler convert_to_bytes avec quelques échantillons, écrire les octets directement dans un fichier binaire sans entête et les importer comme «Raw data» dans Audacity.
+	with open("output/test.bin", "wb") as out_file:
+		data = convert_to_bytes([0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
+		out_file.write(data)
+
+	# Exemple simple avec quelques échantillons pour tester le fonctionnement de l'écriture.
 	with open("output/test.wav", "wb") as out_file:
 		headers, data = encode_wave_data([0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
 		out_file.write(headers)
 		out_file.write(data)
 
-	with open("output/perfect_fifth.wav", "wb") as out_file:
-		# On génére un la3 (220 Hz) et un mi4 (intonnation juste, donc ratio de 3/2)
-		sine_a3 = sine_gen(220, 0.4, 5.0)
-		sine_e4 = sine_gen(220 * (3/2), 0.3, 5.0)
+	with open("output/major_chord.wav", "wb") as out_file:
+		# On génére un la3 (220 Hz), un do#4, un mi4 et un la4 (intonnation juste).
+		sine_a3 = sine_gen(220, 0.5, 10.0)
+		sine_cs4 = sine_gen(220 * (5/4), 0.4, 10.0)
+		sine_e4 = sine_gen(220 * (3/2), 0.35, 10.0)
+		sine_a4 = sine_gen(220 * 2, 0.3, 10.0)
 
 		# On met les samples dans des channels séparés (la à gauche, mi à droite)
-		merged = merge_channels([sine_a3, sine_e4])
+		merged = merge_channels([
+			(sum(elems) for elems in zip(sine_a3, sine_cs4)),
+			(sum(elems) for elems in zip(sine_e4, sine_a4))
+		])
 		headers, data = encode_wave_data(merged)
 
 		out_file.write(headers)
 		out_file.write(data)
 
-	with open("data/stravinsky.wav", "rb") as in_file:
+	with open("data/kinship_maj.wav", "rb") as in_file:
 		headers, samples = decode_wave_data(in_file.read())
 		# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade)
 		samples = [s * 0.2 for s in samples]
 		headers, data = encode_wave_data(samples)
 
-		with open("output/stravinsky_mod.wav", "wb") as out_file:
+		with open("output/kinship_mod.wav", "wb") as out_file:
 			out_file.write(headers)
 			out_file.write(data)
 
