@@ -90,14 +90,16 @@ def convert_to_bytes(samples):
 	packer = struct.Struct(f"{len(samples)}h")
 	return packer.pack(*(int(sample * MAX_SAMPLE_VALUE) for sample in samples))
 
-def encode_wave_data(samples):
+def write_wave_file(filename, samples):
 	# Créer les entêtes à encoder à l'aide de create_headers, les encoder en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
 	headers = create_headers(len(samples))
 	headers_bytes = struct.pack(WAVE_FILE_HEADERS_STRUCT, *headers)
 	# Convertir les échantillons en octets avec la fonction convert_to_bytes.
 	data_bytes = convert_to_bytes(samples)
-	# Retourner les octets d'entête et les octets de données (en deux valeurs).
-	return headers_bytes, data_bytes
+	# Ouvrir le fichier donné en écriture binaire et écrire les octets d'entêtes suivis les octets de données.
+	with open(filename, "wb") as out_file:
+		out_file.write(headers_bytes)
+		out_file.write(data_bytes)
 
 def convert_to_samples(sample_bytes):
 	# Faire l'opération inverse de convert_to_bytes, en convertissant des échantillons entiers signés de 16 bits en échantillons réels.
@@ -105,12 +107,18 @@ def convert_to_samples(sample_bytes):
 	int_samples = unpacker.unpack(sample_bytes)
 	return [int_sample / MAX_SAMPLE_VALUE for int_sample in int_samples]
 
-def decode_wave_data(file_bytes):
-	# Décoder les entês en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
-	headers = WaveFileHeaders(*struct.unpack_from(WAVE_FILE_HEADERS_STRUCT, file_bytes))
+def read_wave_file(filename):
+	# Lire les octets des entêtes.
+	headers_size = struct.calcsize(WAVE_FILE_HEADERS_STRUCT)
+	# Ouvrir le fichier en mode lecture binaire.
+	with open(filename, "rb") as in_file:
+		headers_bytes = in_file.read(headers_size)
+		# Décoder les entêtes en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
+		headers = WaveFileHeaders(*struct.unpack_from(WAVE_FILE_HEADERS_STRUCT, headers_bytes))
+		# Lire les octets de données à partir de la fin des entête. Le nombre d'octets à lire est donné par data_size des entêtes.
+		data_bytes = in_file.read(headers.data_size)
 	# Décoder les octets de données en échantillons réel avec la fonction convert_to_samples en se positionnant au début des données (après les octets).
-	data_start = struct.calcsize(WAVE_FILE_HEADERS_STRUCT)
-	samples = convert_to_samples(file_bytes[data_start:])
+	samples = convert_to_samples(data_bytes)
 	# Retourner les entêtes décodés (sous la forme d'un WaveFileHeaders) et la liste d'échantillons réel en deux valeurs.
 	return headers, samples
 
@@ -125,37 +133,25 @@ def main():
 		out_file.write(data)
 
 	# Exemple simple avec quelques échantillons pour tester le fonctionnement de l'écriture.
-	with open("output/test.wav", "wb") as out_file:
-		headers, data = encode_wave_data([0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
-		out_file.write(headers)
-		out_file.write(data)
+	write_wave_file("output/test.wav", [0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
 
-	with open("output/major_chord.wav", "wb") as out_file:
-		# On génére un la3 (220 Hz), un do#4, un mi4 et un la4 (intonnation juste).
-		sine_a3 = sine_gen(220, 0.5, 10.0)
-		sine_cs4 = sine_gen(220 * (5/4), 0.4, 10.0)
-		sine_e4 = sine_gen(220 * (3/2), 0.35, 10.0)
-		sine_a4 = sine_gen(220 * 2, 0.3, 10.0)
+	# On génére un la3 (220 Hz), un do#4, un mi4 et un la4 (intonnation juste).
+	sine_a3 = sine_gen(220, 0.5, 5.0)
+	sine_cs4 = sine_gen(220 * (5/4), 0.4, 5.0)
+	sine_e4 = sine_gen(220 * (3/2), 0.35, 5.0)
+	sine_a4 = sine_gen(220 * 2, 0.3, 5.0)
 
-		# On met les samples dans des channels séparés (la et do# à gauche, mi et la à droite)
-		merged = merge_channels([
-			(sum(elems) for elems in zip(sine_a3, sine_cs4)),
-			(sum(elems) for elems in zip(sine_e4, sine_a4))
-		])
-		headers, data = encode_wave_data(merged)
+	# On met les samples dans des channels séparés (la et do# à gauche, mi et la à droite)
+	merged = merge_channels([
+		(sum(elems) for elems in zip(sine_a3, sine_cs4)),
+		(sum(elems) for elems in zip(sine_e4, sine_a4))
+	])
+	write_wave_file("output/major_chord.wav", merged)
 
-		out_file.write(headers)
-		out_file.write(data)
-
-	with open("data/kinship_maj.wav", "rb") as in_file:
-		headers, samples = decode_wave_data(in_file.read())
-		# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade)
-		samples = [s * 0.2 for s in samples]
-		headers, data = encode_wave_data(samples)
-
-		with open("output/kinship_mod.wav", "wb") as out_file:
-			out_file.write(headers)
-			out_file.write(data)
+	_, samples = read_wave_file("data/kinship_maj.wav")
+	# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade)
+	samples = [s * 0.2 for s in samples]
+	write_wave_file("output/kinship_mod.wav", samples)
 
 if __name__ == "__main__":
 	main()

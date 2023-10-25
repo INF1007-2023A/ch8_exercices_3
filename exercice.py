@@ -88,18 +88,21 @@ def convert_to_bytes(samples):
 	# Les échantillons en entrée sont entre -1 et 1, nous voulons les mettre entre -MAX_SAMPLE_VALUE et MAX_SAMPLE_VALUE
 	pass
 
-def encode_wave_data(samples):
+def write_wave_file(filename, samples):
 	# Créer les entêtes à encoder à l'aide de create_headers, les encoder en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
 	# Convertir les échantillons en octets avec la fonction convert_to_bytes.
-	# Retourner les octets d'entête et les octets de données (en deux valeurs).
+	# Ouvrir le fichier donné en écriture binaire et écrire les octets d'entêtes suivis les octets de données.
 	pass
 
 def convert_to_samples(sample_bytes):
 	# Faire l'opération inverse de convert_to_bytes, en convertissant des échantillons entiers signés de 16 bits en échantillons réels.
 	pass
 
-def decode_wave_data(file_bytes):
-	# Décoder les entês en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
+def read_wave_file(filename):
+	# Lire les octets des entêtes.
+	# Ouvrir le fichier en mode lecture binaire.
+		# Décoder les entêtes en octets avec le format d'encodage donné dans la constante WAVE_FILE_HEADERS_STRUCT.
+		# Lire les octets de données à partir de la fin des entête. Le nombre d'octets à lire est donné par data_size des entêtes.
 	# Décoder les octets de données en échantillons réel avec la fonction convert_to_samples en se positionnant au début des données (après les octets).
 	# Retourner les entêtes décodés (sous la forme d'un WaveFileHeaders) et la liste d'échantillons réel en deux valeurs.
 	pass
@@ -115,37 +118,25 @@ def main():
 		out_file.write(data)
 
 	# Exemple simple avec quelques échantillons pour tester le fonctionnement de l'écriture.
-	with open("output/test.wav", "wb") as out_file:
-		headers, data = encode_wave_data([0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
-		out_file.write(headers)
-		out_file.write(data)
+	write_wave_file("output/test.wav", [0.8, -0.8, 0.5, -0.5, 0.2, -0.2])
 
-	with open("output/major_chord.wav", "wb") as out_file:
-		# On génére un la3 (220 Hz), un do#4, un mi4 et un la4 (intonnation juste).
-		sine_a3 = sine_gen(220, 0.5, 10.0)
-		sine_cs4 = sine_gen(220 * (5/4), 0.4, 10.0)
-		sine_e4 = sine_gen(220 * (3/2), 0.35, 10.0)
-		sine_a4 = sine_gen(220 * 2, 0.3, 10.0)
+	# On génére un la3 (220 Hz), un do#4, un mi4 et un la4 (intonnation juste).
+	sine_a3 = sine_gen(220, 0.5, 5.0)
+	sine_cs4 = sine_gen(220 * (5/4), 0.4, 5.0)
+	sine_e4 = sine_gen(220 * (3/2), 0.35, 5.0)
+	sine_a4 = sine_gen(220 * 2, 0.3, 5.0)
 
-		# On met les samples dans des channels séparés (la à gauche, mi à droite)
-		merged = merge_channels([
-			(sum(elems) for elems in zip(sine_a3, sine_cs4)),
-			(sum(elems) for elems in zip(sine_e4, sine_a4))
-		])
-		headers, data = encode_wave_data(merged)
+	# On met les samples dans des channels séparés (la et do# à gauche, mi et la à droite)
+	merged = merge_channels([
+		(sum(elems) for elems in zip(sine_a3, sine_cs4)),
+		(sum(elems) for elems in zip(sine_e4, sine_a4))
+	])
+	write_wave_file("output/major_chord.wav", merged)
 
-		out_file.write(headers)
-		out_file.write(data)
-
-	with open("data/kinship_maj.wav", "rb") as in_file:
-		headers, samples = decode_wave_data(in_file.read())
-		# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade)
-		samples = [s * 0.2 for s in samples]
-		headers, data = encode_wave_data(samples)
-
-		with open("output/kinship_mod.wav", "wb") as out_file:
-			out_file.write(headers)
-			out_file.write(data)
+	_, samples = read_wave_file("data/kinship_maj.wav")
+	# On réduit le volume (on pourrait faire n'importe quoi avec les samples à ce stade)
+	samples = [s * 0.2 for s in samples]
+	write_wave_file("output/kinship_mod.wav", samples)
 
 if __name__ == "__main__":
 	main()
